@@ -36,86 +36,122 @@
   </main>
 
   <script>
-    // GANTI dengan URL Worker kamu:
-    const API_BASE = "https://inven-pkm.zakunime.workers.dev/api/assets";
+const API_BASE = "https://inven-pkm.zakunime.workers.dev/api/assets";
 
-    const app = document.getElementById("app");
-    const q = document.getElementById("q");
-    const btn = document.getElementById("btn");
+const app = document.getElementById("app");
 
-    function getHashAssetId() {
-      // format: #/SN-XXXX
-      const h = location.hash || "";
-      const m = h.match(/^#\/(.+)$/);
-      return m ? decodeURIComponent(m[1]) : "";
+function getRoute() {
+  const h = location.hash.replace("#", "");
+  if (!h || h === "/") return { type: "list" };
+
+  const parts = h.split("/");
+  if (parts[1] === "asset" && parts[2]) {
+    return { type: "detail", assetId: decodeURIComponent(parts[2]) };
+  }
+
+  return { type: "list" };
+}
+
+async function fetchData(assetId = null) {
+  const url = assetId
+    ? `${API_BASE}?assetId=${encodeURIComponent(assetId)}`
+    : API_BASE;
+
+  const res = await fetch(url);
+  return await res.json();
+}
+
+async function render() {
+  app.innerHTML = `<div class="muted">Loading…</div>`;
+
+  try {
+    const route = getRoute();
+
+    if (route.type === "list") {
+      const data = await fetchData();
+      renderList(data.items || []);
     }
 
-    async function load(assetId = "") {
-      app.innerHTML = `<div class="muted">Loading…</div>`;
-      const url = assetId ? `${API_BASE}?assetId=${encodeURIComponent(assetId)}` : API_BASE;
-      const res = await fetch(url);
-      const data = await res.json();
-
-      if (data.error) {
-        app.innerHTML = `<div class="card"><b>Error</b><div class="muted">${data.detail || data.error}</div></div>`;
-        return;
-      }
-
-      const items = data.items || [];
-      if (!items.length) {
-        app.innerHTML = `<div class="card"><b>Tidak ditemukan</b><div class="muted">Pastikan Asset ID benar, dan item sudah Public?</div></div>`;
-        return;
-      }
-
-      app.innerHTML = items.map(renderCard).join("");
+    if (route.type === "detail") {
+      const data = await fetchData(route.assetId);
+      renderDetail(data.items?.[0]);
     }
 
-    function renderCard(it) {
-      return `
-        <div class="card">
-          <h2 style="margin:0 0 6px 0">${escapeHtml(it.name || "-")}</h2>
-          <div class="muted" style="margin-bottom:10px">Asset ID: <b>${escapeHtml(it.assetId || "-")}</b></div>
-          <div>
-            ${it.category ? `<span class="pill">${escapeHtml(it.category)}</span>` : ""}
-            ${it.condition ? `<span class="pill">${escapeHtml(it.condition)}</span>` : ""}
-            ${it.status ? `<span class="pill">${escapeHtml(it.status)}</span>` : ""}
-            ${it.location ? `<span class="pill">${escapeHtml(it.location)}</span>` : ""}
-          </div>
-          ${it.description ? `<p style="margin:10px 0 0 0">${escapeHtml(it.description)}</p>` : ""}
-        </div>
-      `;
-    }
+  } catch (err) {
+    app.innerHTML = `<div class="card"><b>Error</b><div class="muted">${err}</div></div>`;
+  }
+}
 
-    function escapeHtml(s) {
-      return String(s).replace(/[&<>"']/g, (c) => ({
-        "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
-      }[c]));
-    }
+function renderList(items) {
+  if (!items.length) {
+    app.innerHTML = `<div class="card">Tidak ada data</div>`;
+    return;
+  }
 
-    function goSearch() {
-      const v = q.value.trim();
-      if (!v) {
-        location.hash = "";
-        load("");
-        return;
-      }
-      location.hash = "#/" + encodeURIComponent(v);
-      load(v);
-    }
+  app.innerHTML = items.map(it => `
+    <div class="card" onclick="goDetail('${it.assetId}')"
+         style="cursor:pointer; transition:.2s">
+      <h3 style="margin:0">${escapeHtml(it.name)}</h3>
+      <div class="muted">Asset ID: ${escapeHtml(it.assetId)}</div>
+      <div style="margin-top:6px">
+        ${it.category ? `<span class="pill">${it.category}</span>` : ""}
+        ${it.condition ? `<span class="pill">${it.condition}</span>` : ""}
+      </div>
+    </div>
+  `).join("");
+}
 
-    btn.addEventListener("click", goSearch);
-    q.addEventListener("keydown", (e) => { if (e.key === "Enter") goSearch(); });
+function renderDetail(it) {
+  if (!it) {
+    app.innerHTML = `<div class="card">Asset tidak ditemukan</div>`;
+    return;
+  }
 
-    window.addEventListener("hashchange", () => {
-      const assetId = getHashAssetId();
-      q.value = assetId;
-      load(assetId);
-    });
+  app.innerHTML = `
+    <div class="card">
+      <button onclick="goHome()" style="margin-bottom:12px">← Kembali</button>
 
-    // initial
-    const assetId = getHashAssetId();
-    q.value = assetId;
-    load(assetId);
-  </script>
+      <h2 style="margin-top:0">${escapeHtml(it.name)}</h2>
+      <div class="muted" style="margin-bottom:10px">
+        Asset ID: ${escapeHtml(it.assetId)}
+      </div>
+
+      ${it.photo ? `
+        <img src="${it.photo}" 
+             style="width:100%; max-height:400px; object-fit:cover; border-radius:12px; margin-bottom:12px;">
+      ` : ""}
+
+      <div class="grid">
+        <div><b>Kategori:</b><br>${it.category || "-"}</div>
+        <div><b>Kondisi:</b><br>${it.condition || "-"}</div>
+        <div><b>Status:</b><br>${it.status || "-"}</div>
+        <div><b>Lokasi:</b><br>${it.location || "-"}</div>
+      </div>
+
+      ${it.description ? `
+        <hr style="margin:16px 0; border-color:#222;">
+        <div>${escapeHtml(it.description)}</div>
+      ` : ""}
+    </div>
+  `;
+}
+
+function goDetail(id) {
+  location.hash = `/asset/${encodeURIComponent(id)}`;
+}
+
+function goHome() {
+  location.hash = "/";
+}
+
+function escapeHtml(s) {
+  return String(s || "").replace(/[&<>"']/g, c => ({
+    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
+  }[c]));
+}
+
+window.addEventListener("hashchange", render);
+render();
+</script>
 </body>
 </html>

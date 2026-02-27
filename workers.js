@@ -42,7 +42,7 @@ export default {
       // Mapping Notion -> JSON publik (sembunyikan field sensitif di sini)
       const items = data.results.map((p) => ({
         id: p.id,
-        name: title(p.properties.Name),
+        name: title(p.properties.Item),
         assetId: richText(p.properties["Serial / Asset ID"]),
         category: select(p.properties.Category),
         condition: select(p.properties.Condition),
