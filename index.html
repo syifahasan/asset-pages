@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Asset Pages</title>
+  <style>
+    body { font-family: system-ui, Arial; margin: 0; background: #0b0b0c; color: #f2f2f2; }
+    header { padding: 20px; border-bottom: 1px solid #222; }
+    .wrap { max-width: 900px; margin: 0 auto; padding: 18px; }
+    .card { background: #141416; border: 1px solid #222; border-radius: 14px; padding: 16px; margin: 12px 0; }
+    .muted { color: #b7b7b7; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .pill { display:inline-block; padding: 4px 10px; border: 1px solid #2a2a2a; border-radius: 999px; margin-right: 6px; }
+    a { color: #7cc4ff; }
+    input { width:100%; padding: 10px 12px; border-radius: 10px; border:1px solid #2a2a2a; background:#0f0f10; color:#fff; }
+    button { padding: 10px 12px; border-radius: 10px; border:1px solid #2a2a2a; background:#1b1b1d; color:#fff; cursor:pointer; }
+    .row { display:flex; gap:10px; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <h1 style="margin:0">Public Asset Pages</h1>
+      <div class="muted">Scan QR → buka halaman aset</div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <div class="row">
+      <input id="q" placeholder="Cari Asset ID (contoh: SN-EXAMPLE-12345) lalu Enter…" />
+      <button id="btn">Cari</button>
+    </div>
+
+    <div id="app" style="margin-top:14px"></div>
+  </main>
+
+  <script>
+    // GANTI dengan URL Worker kamu:
+    const API_BASE = "https://YOUR-WORKER-DOMAIN/api/assets";
+
+    const app = document.getElementById("app");
+    const q = document.getElementById("q");
+    const btn = document.getElementById("btn");
+
+    function getHashAssetId() {
+      // format: #/SN-XXXX
+      const h = location.hash || "";
+      const m = h.match(/^#\/(.+)$/);
+      return m ? decodeURIComponent(m[1]) : "";
+    }
+
+    async function load(assetId = "") {
+      app.innerHTML = `<div class="muted">Loading…</div>`;
+      const url = assetId ? `${API_BASE}?assetId=${encodeURIComponent(assetId)}` : API_BASE;
+      const res = await fetch(url);
+      const data = await res.json();
+
+      if (data.error) {
+        app.innerHTML = `<div class="card"><b>Error</b><div class="muted">${data.detail || data.error}</div></div>`;
+        return;
+      }
+
+      const items = data.items || [];
+      if (!items.length) {
+        app.innerHTML = `<div class="card"><b>Tidak ditemukan</b><div class="muted">Pastikan Asset ID benar, dan item sudah Public?</div></div>`;
+        return;
+      }
+
+      app.innerHTML = items.map(renderCard).join("");
+    }
+
+    function renderCard(it) {
+      return `
+        <div class="card">
+          <h2 style="margin:0 0 6px 0">${escapeHtml(it.name || "-")}</h2>
+          <div class="muted" style="margin-bottom:10px">Asset ID: <b>${escapeHtml(it.assetId || "-")}</b></div>
+          <div>
+            ${it.category ? `<span class="pill">${escapeHtml(it.category)}</span>` : ""}
+            ${it.condition ? `<span class="pill">${escapeHtml(it.condition)}</span>` : ""}
+            ${it.status ? `<span class="pill">${escapeHtml(it.status)}</span>` : ""}
+            ${it.location ? `<span class="pill">${escapeHtml(it.location)}</span>` : ""}
+          </div>
+          ${it.description ? `<p style="margin:10px 0 0 0">${escapeHtml(it.description)}</p>` : ""}
+        </div>
+      `;
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, (c) => ({
+        "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
+      }[c]));
+    }
+
+    function goSearch() {
+      const v = q.value.trim();
+      if (!v) {
+        location.hash = "";
+        load("");
+        return;
+      }
+      location.hash = "#/" + encodeURIComponent(v);
+      load(v);
+    }
+
+    btn.addEventListener("click", goSearch);
+    q.addEventListener("keydown", (e) => { if (e.key === "Enter") goSearch(); });
+
+    window.addEventListener("hashchange", () => {
+      const assetId = getHashAssetId();
+      q.value = assetId;
+      load(assetId);
+    });
+
+    // initial
+    const assetId = getHashAssetId();
+    q.value = assetId;
+    load(assetId);
+  </script>
+</body>
+</html>
