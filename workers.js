@@ -22,7 +22,7 @@ export default {
         body: JSON.stringify({
           filter: {
             and: [
-              { property: "Public?", checkbox: { equals: true } },
+              { property: "Public", checkbox: { equals: true } },
               ...(assetId
                 ? [{ property: "Serial / Asset ID", rich_text: { equals: assetId } }]
                 : [])
